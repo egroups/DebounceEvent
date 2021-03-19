@@ -149,8 +149,6 @@ begin
   self.FSourceEvent := ASourceEvent;
   self.Interval := AInterval;
 
-  //self.Timer := TTimer.Create(self);
-  //self.Timer.Enabled := false;
   self.Timer.Interval := AInterval;
   self.Timer.OnTimer := self.DoOnTimer;
 end;
@@ -208,8 +206,6 @@ begin
   self.SourceEvent := ASourceEvent;
   self.Interval := AInterval;
 
-  //self.Timer := TTimer.Create(self);
-  //self.Timer.Enabled := false;
   self.Timer.Interval := AInterval;
   self.Timer.OnTimer := self.DoOnTimer;
 end;
