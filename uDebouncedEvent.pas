@@ -13,7 +13,7 @@ uses
   System.Classes,
   System.SysUtils,
   System.DateUtils,
-  Vcl.ExtCtrls, Vcl.Controls;
+  Vcl.ExtCtrls, Vcl.Controls, Data.DB;
 
 type
   TBaseDebouncedEvent=class(TComponent)
@@ -81,6 +81,23 @@ type
         integer); reintroduce;
     class function Wrap(ASourceEvent: TKeyPressEvent; AInterval: integer; AOwner:
         TComponent): TKeyPressEvent;
+  end;
+
+  TDebouncedDatasetEvent = class(TBaseDebouncedEvent)
+  private
+    FDataset: TDataSet;
+    FSourceEvent: TDataSetNotifyEvent;
+    procedure DebouncedEvent(Dataset: TDataSet);
+    procedure DoCallEvent(var Dataset: TDataSet);
+    procedure DoOnTimer(Sender: TObject); override;
+    property SourceEvent: TDataSetNotifyEvent read FSourceEvent write FSourceEvent;
+  protected
+    property Dataset: TDataSet read FDataset write FDataset;
+  public
+    constructor Create(AOwner: TComponent; ASourceEvent: TDataSetNotifyEvent;
+        AInterval: integer); reintroduce;
+    class function Wrap(ASourceEvent: TDataSetNotifyEvent; AInterval: integer;
+        AOwner: TComponent): TDataSetNotifyEvent;
   end;
 
 implementation
@@ -258,6 +275,61 @@ begin
   inherited;
   self.Timer := TTimer.Create(self);
   self.Timer.Enabled := false;
+end;
+
+{ TDebouncedDatasetEvent }
+
+constructor TDebouncedDatasetEvent.Create(AOwner: TComponent; ASourceEvent:
+    TDataSetNotifyEvent; AInterval: integer);
+begin
+  inherited Create(AOwner);
+  self.SourceEvent := ASourceEvent;
+  self.Interval := AInterval;
+
+  self.Timer.Interval := AInterval;
+  self.Timer.OnTimer := self.DoOnTimer;
+end;
+
+procedure TDebouncedDatasetEvent.DebouncedEvent(Dataset: TDataSet);
+var
+  Between: int64;
+begin
+  Between := MilliSecondsBetween(Now, self.LastcallTimestamp);
+
+  // if timer is not enabled, it means that last call happened
+  // earlier than <self.FInteval> milliseconds ago
+  if Between >= self.Interval then begin
+    self.DoCallEvent(Dataset);
+  end
+  else begin
+    // adjusting timer, so interval between calls will never be more than <FInterval> ms
+    self.Timer.Interval := self.Interval - Between;
+
+    // reset the timer
+    self.Timer.Enabled := false;
+    self.Timer.Enabled := true;
+
+    // remember last Sender argument value to use it in a delayed call
+    self.Sender := Sender;
+  end;
+end;
+
+procedure TDebouncedDatasetEvent.DoCallEvent(var Dataset: TDataSet);
+begin
+  self.LastcallTimestamp := Now;
+  self.FSourceEvent(self.Dataset);
+end;
+
+procedure TDebouncedDatasetEvent.DoOnTimer(Sender: TObject);
+begin
+  self.Timer.Enabled := false;
+  self.DoCallEvent(Self.FDataset);
+end;
+
+class function TDebouncedDatasetEvent.Wrap(ASourceEvent: TDataSetNotifyEvent;
+    AInterval: integer; AOwner: TComponent): TDataSetNotifyEvent;
+begin
+  Result := TDebouncedDatasetEvent.Create(AOwner, ASourceEvent, AInterval).DebouncedEvent;
 end;
 
 end.
