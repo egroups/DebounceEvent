@@ -9,3 +9,4 @@ Original:
 Added:
  - TDebouncedKeyEvent
  - TDebouncedKeyPressEvent
+ - TDebouncedDatasetEvent
